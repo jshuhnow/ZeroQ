@@ -117,7 +117,7 @@ class AsymmetricQuantFunction(Function):
         x: single-precision value to be quantized
         k: bit-setting for x
         x_min: lower bound for quantization range
-        x_max=None
+        x_max: upper bound for qunatization range
         """
 
         if x_min is None or x_max is None or (sum(x_min == x_max) == 1
