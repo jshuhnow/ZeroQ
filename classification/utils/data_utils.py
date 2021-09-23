@@ -70,7 +70,7 @@ def getRandomData(dataset='cifar10', batch_size=512, for_inception=False):
 
 def getTestData(dataset='imagenet',
                 batch_size=1024,
-                path='data/imagenet',
+                path='./data/imagenet/',
                 for_inception=False):
     """
     Get dataloader of testset 
@@ -97,7 +97,7 @@ def getTestData(dataset='imagenet',
                                  num_workers=32)
         return test_loader
     elif dataset == 'cifar10':
-        data_dir = '/rscratch/yaohuic/data/'
+        data_dir = './data/cifar/'
         normalize = transforms.Normalize(mean=(0.4914, 0.4822, 0.4465),
                                          std=(0.2023, 0.1994, 0.2010))
         transform_test = transforms.Compose([transforms.ToTensor(), normalize])
