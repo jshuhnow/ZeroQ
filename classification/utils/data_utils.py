@@ -62,7 +62,7 @@ def getRandomData(dataset='cifar10', batch_size=512, for_inception=False):
             size = (3, 299, 299)
     else:
         raise NotImplementedError
-    dataset = UniformDataset(length=10000, size=size, transform=None)
+    dataset = UniformDataset(length=num_data, size=size, transform=None)
     data_loader = DataLoader(dataset,
                              batch_size=batch_size,
                              shuffle=False,
