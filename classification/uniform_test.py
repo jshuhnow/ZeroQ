@@ -25,7 +25,7 @@ import torch.nn as nn
 from pytorchcv.model_provider import get_model as ptcv_get_model
 from utils import *
 from distill_data import *
-
+import logging
 
 # model settings
 def arg_parse():
@@ -58,26 +58,29 @@ def arg_parse():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(format='%(asctime)s %(message)s',level=logging.INFO)
+
     args = arg_parse()
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
 
     # Load pretrained model
     model = ptcv_get_model(args.model, pretrained=True)
-    print('****** Full precision model loaded ******')
+    logging.info('****** Full precision model loaded ******')
 
     # Load validation data
     test_loader = getTestData(args.dataset,
                               batch_size=args.test_batch_size,
-                              path='./data/imagenet/',
                               for_inception=args.model.startswith('inception'))
+    logging.info('****** Data loaded ******')
+
     # Generate distilled data
     dataloader = getDistilData(
         model.cuda(),
         args.dataset,
         batch_size=args.batch_size,
         for_inception=args.model.startswith('inception'))
-    print('****** Data loaded ******')
+    logging.info('****** Distilled Data Generated ******')
 
     # Quantize single-precision model to 8-bit model
     quantized_model = quantize_model(model)
@@ -87,7 +90,7 @@ if __name__ == '__main__':
 
     # Update activation range according to distilled data
     update(quantized_model, dataloader)
-    print('****** Zero Shot Quantization Finished ******')
+    logging.info('****** Zero Shot Quantization Finished ******')
 
     # Freeze activation range during test
     freeze_model(quantized_model)
