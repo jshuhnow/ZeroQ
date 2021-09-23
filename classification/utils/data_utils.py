@@ -21,7 +21,9 @@
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets, transforms
 import torch
+import multiprocessing
 
+num_workers=multiprocessing.cpu_count()
 
 class UniformDataset(Dataset):
     """
@@ -64,7 +66,7 @@ def getRandomData(dataset='cifar10', batch_size=512, for_inception=False):
     data_loader = DataLoader(dataset,
                              batch_size=batch_size,
                              shuffle=False,
-                             num_workers=32)
+                             num_workers=num_workers)
     return data_loader
 
 
@@ -94,7 +96,7 @@ def getTestData(dataset='imagenet',
         test_loader = DataLoader(test_dataset,
                                  batch_size=batch_size,
                                  shuffle=False,
-                                 num_workers=32)
+                                 num_workers=num_workers)
         return test_loader
     elif dataset == 'cifar10':
         data_dir = './data/cifar/'
@@ -104,9 +106,9 @@ def getTestData(dataset='imagenet',
 
         test_dataset = datasets.CIFAR10(root=data_dir,
                                         train=False,
-                                        transform=transform_test)
+                                        transform=transform_test, download=True)
         test_loader = DataLoader(test_dataset,
                                  batch_size=batch_size,
                                  shuffle=False,
-                                 num_workers=32)
+                                 num_workers=num_workers)
         return test_loader
