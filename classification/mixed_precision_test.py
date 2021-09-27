@@ -54,11 +54,10 @@ def arg_parse():
                         type=int,
                         default=128,
                         help='batch size of test data')
-    parser.add_argument('--mp_bit_budget',
+    parser.add_argument('--num_distill_iter',
                         type=int,
-                        default=8,
-                        help='bit budget for mixed-precision'
-                        )
+                        default=500,
+                        help="# of iterations for generating a distilled data")
     args = parser.parse_args()
     return args
 
@@ -89,7 +88,8 @@ if __name__ == '__main__':
         fp32_model.cuda(),
         args.dataset,
         batch_size=args.batch_size,
-        for_inception=args.model.startswith('inception'))
+        for_inception=args.model.startswith('inception'),
+        num_iter=args.num_distill_iter)
     logging.info('****** Generated a Distilled Data ******')
 
     logging.info('****** Converting to an INT8 model ******')

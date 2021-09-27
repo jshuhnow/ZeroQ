@@ -54,7 +54,9 @@ def getDistilData(teacher_model,
                   dataset,
                   batch_size,
                   num_batch=1,
-                  for_inception=False):
+                  for_inception=False,
+                  num_iter=500
+                  ):
     """
 	Generate distilled data according to the BatchNorm statistics in the pretrained single-precision model.
 	Currently only support a single GPU.
@@ -113,9 +115,8 @@ def getDistilData(teacher_model,
         input_mean = torch.zeros(1, 3).cuda()
         input_std = torch.ones(1, 3).cuda()
 
-        NUM_ITER = 500
-        bar = Bar('Genearting', max=NUM_ITER)
-        for it in range(NUM_ITER):
+        bar = Bar('Genearting', max=num_iter)
+        for it in range(num_iter):
             teacher_model.zero_grad()
             optimizer.zero_grad()
             for hook in hooks:
@@ -152,7 +153,7 @@ def getDistilData(teacher_model,
             optimizer.step()
             scheduler.step(total_loss.item())
             
-            bar.suffix = f'Iter - {(it+1)}/{NUM_ITER} | ETA: {bar.eta_td}'
+            bar.suffix = f'Iter - {(it+1)}/{num_iter} | ETA: {bar.eta_td}'
             bar.next()
 
         refined_gaussian.append(gaussian_data.detach().clone())
