@@ -5,4 +5,6 @@ MODEL_SIZE_MB = {
     'resnet50' : 97.49,
     'mobilenetv2_w1' : 13.37,
     'shufflenet_g1_w1' : 65.07,
+    'inceptionv3': 90.99,
+    'sqnxt23_w2' : 9.60
 }
