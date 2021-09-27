@@ -3,3 +3,5 @@ progressbar>=1.5
 progress
 torch
 torchvision
+plotly
+kaleido

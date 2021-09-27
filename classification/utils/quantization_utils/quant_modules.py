@@ -29,7 +29,39 @@ from .quant_utils import *
 import sys
 
 
-class QuantAct(Module):
+class Quant(Module):
+    def __init__(self):
+        super(Quant, self).__init__()
+
+    def __repr__(self):
+        pass
+
+    def fix(self):
+        pass
+
+    def forward(self):
+        pass
+
+class QuantWeight(Quant):
+    def __init__(self):
+        super(QuantWeight, self).__init__()
+
+    def set_param(self, weight):
+        pass
+
+    def get_weight_bit(self):
+        return self.weight_bit
+
+    def set_weight_bit(self, weight_bit):
+        self.weight_bit = weight_bit
+    
+    def get_param_size(self):
+        sz = 1
+        for dim in self.weight.size():
+            sz *= dim
+        return sz
+        
+class QuantAct(Quant):
     """
     Class to quantize given activations
     """
@@ -63,6 +95,9 @@ class QuantAct(Module):
         """
         self.running_stat = False
 
+    def unfix(self):
+        self.running_stat = True
+
     def forward(self, x):
         """
         quantize given activation x
@@ -82,7 +117,7 @@ class QuantAct(Module):
             return x
 
 
-class Quant_Linear(Module):
+class Quant_Linear(QuantWeight):
     """
     Class to quantize given linear layer weights
     """
@@ -128,7 +163,7 @@ class Quant_Linear(Module):
         return F.linear(x, weight=w, bias=self.bias)
 
 
-class Quant_Conv2d(Module):
+class Quant_Conv2d(QuantWeight):
     """
     Class to quantize given convolutional layer weights
     """

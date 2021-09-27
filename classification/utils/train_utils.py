@@ -18,9 +18,10 @@
 # along with ZeroQ repository.  If not, see <http://www.gnu.org/licenses/>.
 #*
 
+from re import S
+
 import torch
 import os
-import torch.nn as nn
 from progress.bar import Bar
 
 
@@ -40,7 +41,7 @@ def test(model, test_loader):
             correct += predicted.eq(targets).sum().item()
             acc = correct / total
 
-            bar.suffix = f'({batch_idx + 1}/{len(test_loader)}) | ETA: {bar.eta_td} | top1: {acc}'
+            bar.suffix = f'({batch_idx + 1}/{len(test_loader)}) | ETA: {bar.eta_td} | top1: {acc : .3f}'
             bar.next()
     print('\nFinal acc: %.2f%% (%d/%d)' % (100. * acc, correct, total))
     bar.finish()
@@ -61,3 +62,4 @@ def update(quantized_model, distilD):
             inputs = inputs.cuda()
             outputs = quantized_model(inputs)
     return quantized_model
+

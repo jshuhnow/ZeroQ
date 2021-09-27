@@ -25,7 +25,7 @@ import torch.nn as nn
 import copy
 import torch.optim as optim
 from utils import *
-
+from progress.bar import Bar
 
 def own_loss(A, B):
     """
@@ -83,7 +83,7 @@ def getDistilData(teacher_model,
         for layer in teacher_model.modules()
     ])
 
-    for n, m in teacher_model.named_modules():
+    for idx, m in teacher_model.named_modules():
         if isinstance(m, nn.Conv2d) and len(hook_handles) < layers:
             # register hooks on the convolutional layers to get the intermediate output after convolution and before BatchNorm.
             hook = output_hook()
@@ -113,7 +113,9 @@ def getDistilData(teacher_model,
         input_mean = torch.zeros(1, 3).cuda()
         input_std = torch.ones(1, 3).cuda()
 
-        for it in range(500):
+        NUM_ITER = 500
+        bar = Bar('Genearting', max=NUM_ITER)
+        for it in range(NUM_ITER):
             teacher_model.zero_grad()
             optimizer.zero_grad()
             for hook in hooks:
@@ -149,9 +151,13 @@ def getDistilData(teacher_model,
             total_loss.backward()
             optimizer.step()
             scheduler.step(total_loss.item())
+            
+            bar.suffix = f'Iter - {(it+1)}/{NUM_ITER} | ETA: {bar.eta_td}'
+            bar.next()
 
         refined_gaussian.append(gaussian_data.detach().clone())
-
+        bar.finish()
+        
     for handle in hook_handles:
         handle.remove()
     return refined_gaussian
