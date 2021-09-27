@@ -64,7 +64,7 @@ def arg_parse():
 
 if __name__ == '__main__':
     args = arg_parse()
-    logging.basicConfig(format='%(asctime)s %(message)s',level=logging.INFO, filename=f'./res/{args.model}_{args.mp_bit_budget}.log')
+    logging.basicConfig(format='%(asctime)s %(message)s',level=logging.INFO)
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
 
