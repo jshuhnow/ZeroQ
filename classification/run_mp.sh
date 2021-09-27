@@ -1,3 +1,5 @@
+set -x
+
 python3 mixed_precision_test.py \
     --dataset=imagenet \
     --model=resnet18 \
