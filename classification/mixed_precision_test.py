@@ -58,6 +58,9 @@ def arg_parse():
                         type=int,
                         default=500,
                         help="# of iterations for generating a distilled data")
+    parser.add_argument('--percentile',dest='percentile',action='store_true')
+    parser.set_defaults(feature=False)
+
     args = parser.parse_args()
     return args
 
@@ -107,17 +110,24 @@ if __name__ == '__main__':
 
     # Freeze activation range during test
     freeze_model(int8_model)
-    best_config = search_mixed_precision(
-        int8_model, dataloader, MODEL_SIZE_MB[args.model] / 32 * args.mp_bit_budget, plot_path=f"./res/{args.model}_{args.mp_bit_budget}.png"
-        # a=7, b=100, t0=7, t=3
+    
+    list_mp_bit_budget=[4, 6]
+    configs = search_mixed_precision(
+        int8_model, dataloader, MODEL_SIZE_MB[args.model], plot_path=f"./res/{args.model}.png",
+        list_mp_bit_budget=list_mp_bit_budget,
+        # a=7, b=100, t0=7, t=2
     )
-    logging.info(f'Best Bit Setting: {best_config}')
-    unfreeze_model(int8_model)
-    update(int8_model, dataloader)
-    freeze_model(int8_model)
-
+    
     int8_model = nn.DataParallel(int8_model).cuda()
-    # Test the final quantized model
-    logging.info('****** Testing ******')
-    test(int8_model, test_loader)
-    logging.info('****** Finished Testing ******')
+    for idx, config in enumerate(configs):
+        logging.info(f'Best {list_mp_bit_budget[idx]}-Bit Setting: {config}')
+        set_quant_bit(int8_model, config)
+
+        unfreeze_model(int8_model)
+        update(int8_model, dataloader)
+        freeze_model(int8_model)
+
+        # Test the final quantized model
+        logging.info('****** Testing ******')
+        test(int8_model, test_loader)
+        logging.info('****** Finished Testing ******')

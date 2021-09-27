@@ -1,5 +1,6 @@
 
 from typing import Dict, List
+from progress.bar import Bar
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,6 +8,8 @@ from .quantization_utils.quant_modules import QuantWeight, QuantAct
 from .plot_pareto_frontier import plot_to_file
 import logging
 
+def bit_to_mb(bit : int):
+    return bit / (8 * 1024 * 1024)
 
 def _get_wt_layers(model: nn.Module) -> List[QuantWeight]:
     wt_layers = []
@@ -34,10 +37,20 @@ def _calc_sens(P, Q):
 
     return (kl_divergence(P, Q) + kl_divergence(Q, P)) / 2
 
+def set_quant_bit(quantized_model, config):
+    """
+    set the quantization bit in-place
+    """
+    wt_layers = _get_wt_layers(quantized_model)
+    
+    # set weight bits with `best_config`
+    for layer_idx, wt_layer in enumerate(wt_layers):
+        wt_layer.set_weight_bit(config.list_wt_bit[layer_idx])
 
-def search_mixed_precision(quantized_model, dataloader, model_size_limit_mb : float,
-        plot_path,
-        weight_candidate=[2,4,8],a=5, b=200, t0 = 10, t=5,
+
+def search_mixed_precision(quantized_model, dataloader, model_sz_mb : float,
+        plot_path, list_mp_bit_budget,
+        wt_cand=[2,4,8],a=5, b=200, t0 = 10, t=5
     ):
     """
     NOTE: quantized_model is being modified (from the left to the right) within this function
@@ -48,15 +61,12 @@ def search_mixed_precision(quantized_model, dataloader, model_size_limit_mb : fl
         """
         Be cautious of potential overflow
         """
-        return round((bits / (model_size_limit_mb * 8 * 1024 * 1024)) * b)
+        return round((bits / (model_sz_mb * 8 * 1024 * 1024)) * b)
 
-    def from_b_to_mb(b_idx : int):
-        return (b_idx / float(b)) * (model_size_limit_mb)
-    
     # ensure that the order
-    weight_candidate.sort()
+    wt_cand.sort()
 
-    m = len(weight_candidate)
+    m = len(wt_cand)
     wt_layers = _get_wt_layers(quantized_model)
     L = len(wt_layers)
     
@@ -75,16 +85,21 @@ def search_mixed_precision(quantized_model, dataloader, model_size_limit_mb : fl
     
     _disable_full_precision(quantized_model)
 
+    logging.info(f'*** Calculating the sensitivity with indepdence assumption ***')
+    bar = Bar('Calculating', max=L)
+
     local_sens = [ [0 for z in range(m)] for _ in range(L)]
     for layer_idx, wt_layer in enumerate(wt_layers):
-        for wt_idx, wt_bit in enumerate(weight_candidate):
+        for wt_idx, wt_bit in enumerate(wt_cand):
             wt_layer.set_weight_bit(wt_bit)
             with torch.no_grad():
                 output = quantized_model(sample_batch)
                 output = F.softmax(output, dim=1)
                 local_sens[layer_idx][wt_idx]= _calc_sens(output, gt_output)
+        bar.next()
+    bar.finish()
 
-    # all the weights are set to the last bit of the 
+    # Now all the weights are set to the last bit of `wt_cand` (8bit)
 
     ### BEGIN Init
     dp = [ [ Configs() for z in range(b)] for y in range(L+1)]
@@ -99,11 +114,11 @@ def search_mixed_precision(quantized_model, dataloader, model_size_limit_mb : fl
         for layer_idx_in_grp in range(a0):
             
             layer_idx = lgrp_idx * a + layer_idx_in_grp
-            logging.info(layer_idx)
+            logging.info(f'Layer {layer_idx}')
             
             wt_layer = wt_layers[layer_idx]
 
-            for wt_idx, wt_bit in enumerate(weight_candidate):
+            for wt_idx, wt_bit in enumerate(wt_cand):
                 delta_bit = wt_layer.get_param_size() * wt_bit
                 delta_sens = local_sens[layer_idx][wt_idx]
 
@@ -147,34 +162,37 @@ def search_mixed_precision(quantized_model, dataloader, model_size_limit_mb : fl
     x = []
     y = []
 
-    x_pareto = []
-    y_pareto = []
-    
-    best_config : Config = None
+    all_configs = []
 
     for b_idx in range(b):
         if dp[-2][b_idx].configs:
-            sens = dp[-2][b_idx].configs[0].sens
-            sz = from_b_to_mb(b_idx)
-            x_pareto.append(sz)
-            y_pareto.append(sens)
+            all_configs += dp[-2][b_idx].configs
 
-            if best_config is None or best_config.sens > sens:
-                best_config = dp[-2][b_idx].configs[0]
+    all_configs.sort(key=lambda x: (x.acc_bit, x.sens))
+    list_pareto = []
 
-        for config in dp[-2][b_idx].configs:
-            x.append(sz)
-            y.append(config.sens)
+    prv_sens = 1e9
+    for pareto_cand in all_configs:
+        if pareto_cand.sens < prv_sens:
+            prv_sens = pareto_cand.sens
+            list_pareto.append(pareto_cand)
         
-    plot_to_file(x, y, x_pareto, y_pareto, plot_path)
+    plot_to_file(
+        [bit_to_mb(config.acc_bit) for config in all_configs], [config.sens for config in all_configs],
+        [bit_to_mb(config.acc_bit) for config in list_pareto], [config.sens for config in list_pareto],
+        plot_path
+    )
+
     ### END plot
+    res_configs = []
+    for mp_bit_budget in list_mp_bit_budget:
+        n = len(list_pareto)
 
-    # set weight bits with `best_config`
-    for layer_idx, wt_layer in enumerate(wt_layers):
-        wt_layer.set_weight_bit(best_config.list_wt_bit[layer_idx])
-
-    return best_config 
-
+        for i in range(n-1):
+            if list_pareto[i+1].acc_bit >= (model_sz_mb*8) * (mp_bit_budget/32) * 1024 * 1024:
+                res_configs.append(list_pareto[i])
+                break
+    return res_configs
 
 class Config:
     def __init__(self, sens: float, list_wt_bit : List[int], acc_bit : int):
@@ -189,7 +207,6 @@ class Config:
 
     def __repr__(self):
         return f"{{\n\tsens: {self.sens:.3f},\n\tbit : {self.list_wt_bit}\n\tsize: {self.acc_bit / ( 8 * 1024 * 1024):.3f}MB}}"
-            
     
 class Configs:
     def __init__(self):
